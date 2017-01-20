@@ -1,0 +1,20 @@
+{
+    "name": "gremlin-viz",
+    "version": "0.0.1",
+    "description": "Meh",
+    "author": "Vasek Pavlin <vasek@redhat.com>",
+    "scripts": {
+        "start": "node serve.js"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/vpavlin/gremlin-viz"
+    },
+    "dependencies": {
+        "gremlin-client": "^1.0.0",
+        "vivagraphjs": "*",
+        "serve-static": "*",
+        "http": "*",
+        "finalhandler": "*"
+    }
+}

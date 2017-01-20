@@ -1,0 +1,49 @@
+<html>
+    <head>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+        <script type="text/javascript" src="node_modules/gremlin-client/gremlin.js"></script>
+        <script type="text/javascript" src="node_modules/vivagraphjs/dist/vivagraph.js"></script>
+        <script type="text/javascript" src="./index.js"></script>
+        <style type='text/css'>
+            body,
+            svg,
+            #graph-container {
+              height: 100%;
+              width: 100%;
+              position: absolute;
+              overflow: hidden;
+              margin: 0px;
+            }
+            td {
+                border: 1px solid #666;
+                margin: 0 0 0 0;
+                padding: 2px;
+            }
+            table {
+                width: 100%;
+            }
+            #details {
+                position: absolute;
+                right: 0px;
+                width: 200px;
+
+            }
+            text {
+                font-family: sans-serif
+            }
+          </style>
+    </head>
+    <body>
+        <div style="background: #666; color: white;padding: 0.3em">Hints: Double click node to load its neighbors on out-going edges. Hold <kbd>ctrl</kbd> to follow in-going edges.</div>
+        <form>
+            <select id="ecosystems"></select>
+            <input type="text" id="value" />
+            <button id="search">Search</button>
+            <input type="checkbox" checked="checked" id="edgeLabels" /> Show edge labels
+        </form>
+        <div></div>
+        <div id="details"></div>
+        <div id="graphDiv" style="width: 1000px; min-height=1000px;">
+        </div>
+    </body>
+</html>
