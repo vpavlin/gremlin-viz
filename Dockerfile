@@ -10,4 +10,6 @@ RUN yum -y install nodejs npm
 ADD . /opt
 WORKDIR /opt
 
+USER 1000
+
 RUN npm install

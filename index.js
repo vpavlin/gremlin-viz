@@ -2,30 +2,44 @@
 
 function GremlinViz(host, port) {
     //
-    this.host = host
-    this.port = port
+    //
+    this.config = null
+    if (typeof(host) == "object") {
+        this.config = host
+    } else if (typeof(port) == "object") {
+        this.config = port
+    }
+
+    if (this.config === null) {
+        this.config = {}
+        this.config.host = host
+        this.config.port = port
+    }
+    console.log(config)
+    
     this.nodeR = 10
     this.showEdgeLabels = true
     this.detailsElem = $("#details")
     this.filterElem = $("#filter #filters_container")
     this.connectionElem = $("#connection")
+    this.statusTextElem = $("#statusText")
     this.connected = false
     this.connectedCounter = 0
     this.filters = {}
     this.serverNodeCount = 0
     this.graph = Viva.Graph.graph();
-    this.client = gremlin.createClient(port, host)
+    this.client = gremlin.createClient(this.config.port, this.config.host)
     this.client.on('connect', function() {
-        console.log("Connection to Gremlin Server established!");
+        this.updateStatus("Connection to Gremlin Server established!");
         $(this.connectionElem).text("Connected").addClass("on")
         this.connected = true
     }.bind(this));
     this.client.on('disconnect', function() {
-        console.log("Connection to Gremlin Server disconnected!");
-    });
+        this.updateStatus("Connection to Gremlin Server disconnected!");
+    }.bind(this));
     this.client.on('error', function(msg) {
-        console.log("Something is wrong: "+msg) 
-    })
+        this.updateStatus("Something is wrong: "+msg) 
+    }.bind(this))
     this.checkConnection = function() {
         tm = setTimeout(function() {
             this.connected = false
@@ -33,7 +47,7 @@ function GremlinViz(host, port) {
             $(this.connectionElem).text("Disconnected").removeClass("on")
             this.connectionCounter++
             if (this.connectionCounter > 5) {
-                console.log("Reconnecting...")
+                this.updateStatus("Reconnecting...")
                 this.client = gremlin.createClient(port, host)
                 this.connectionCounter = 0
             }
@@ -56,12 +70,11 @@ function GremlinViz(host, port) {
 
 
     this.query = function(query) {
-        console.log("Ready State: "+this.client.ws.readyState)
         if (!this.client.connected) {
             console.log("Disconnected")
         }
 
-        console.log("Will search for "+query)
+        this.updateStatus("Will search for "+query)
         var t = this
         //var q = query+".valueMap(true)"
         var query = this.client.stream(query);
@@ -80,8 +93,8 @@ function GremlinViz(host, port) {
         });
          
         query.on('end', function() {
-          console.log("All results fetched");
-        });
+          this.updateStatus("All results fetched");
+        }.bind(this));
 
         query.on('error', function(e) {
             console.log(e)
@@ -123,9 +136,9 @@ function GremlinViz(host, port) {
            $(ui).click(function(e) {
                t.fillDetails(node)
            })
-           if (t.graph.getNodesCount() == 1) {
+ /*          if (t.graph.getNodesCount() == 1) {
                t.layout.setNodePosition(node.id, 100, 100)
-           }
+           }*/
            /*ui.addEventListener('click', function () {
                // toggle pinned mode
                t.layout.pinNode(node, !t.layout.isNodePinned(node));
@@ -326,7 +339,6 @@ function GremlinViz(host, port) {
 
     this.fillDetails = function(node) {
         var table = $("<table></table>")
-        table.append($("<tr></tr>").html("<td>id</td><td>"+node.id+"</td>"))
         for (i in node.data) {
             var o = node.data[i]
             //console.log(o)
@@ -369,7 +381,11 @@ function GremlinViz(host, port) {
         })
     }
     this.getServerNodeCount()
-
+    
+    this.updateStatus = function(text) {
+        console.log(text)
+        $(this.statusTextElem).text(text).fadeTo(100, 0.1).fadeTo(200, 1.0)
+    }
 
 
 
@@ -414,7 +430,6 @@ var utils = {
             if (err) {
                 console.log(err)
             } else {
-                console.log(result)
                 var legend = []
                 for (i in result) {
                     legend.push($("<div></div>").css('background', utils.getColor(result[i])).text(result[i]))
@@ -452,11 +467,26 @@ var utils = {
 $(document).ready(function() {
     //var host="172.20.0.2"
     //var port=8182
-    var host='gremlin-websocket-data-model.che.ci.centos.org'
-    var port=80
+    //
+    config = {
+        host: 'gremlin-websocket-data-model.che.ci.centos.org',
+        port: "80",
+        search: [
+            {
+                type: "select",
+                id: "ecosystems",
+                property: "ecosystem",
+                values: "ecosystem"
+            },
+            {
+                type: "text",
+                id: "name"
+            }
+        ]
+    }
     
     var s1 = utils.searchByName("serve-static")
-    var gv = new GremlinViz(host, port)
+    var gv = new GremlinViz(config)
     utils.getEcosystems(gv.client)
     utils.getEdgeFilterList(gv.client)
     utils.getLegend(gv.client)
@@ -486,7 +516,7 @@ $(document).ready(function() {
     })
     $("#right_pane h2").click(function() {
         if ($(this).parent().css("right") == "0px") {
-            $(this).parent().css("right", "-300px")
+            $(this).parent().css("right", "-405px")
         } else {
             $(this).parent().css("right", 0)
         }
