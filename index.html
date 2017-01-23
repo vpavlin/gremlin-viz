@@ -13,23 +13,91 @@
               position: absolute;
               overflow: hidden;
               margin: 0px;
+              font-family: sans-serif
             }
             td {
-                border: 1px solid #666;
+                border: 1px solid #eee;
                 margin: 0 0 0 0;
                 padding: 2px;
             }
+            tr:nth-child(even) {
+                background-color: #f0f0f0
+            }
+            tr:hover {
+                background-color: #999;
+                color: white;
+            }
             table {
                 width: 100%;
+                border-collapse: collapse;
             }
-            #details {
+            #right_pane {
                 position: absolute;
-                right: 0px;
-                width: 200px;
-
+                right: -300px;
+                width: 300px;
+                z-index: 1000;
             }
+            #right_pane>div {
+                margin-bottom: 1em;
+            }
+            #right_pane h2 {
+                width: 0px;
+                position: relative;
+                left: -15px;
+                top: 40px;
+                -webkit-transform: rotate(90deg);
+                -moz-transform: rotate(90deg);
+                -o-transform: rotate(90deg);
+                -ms-transform: rotate(90deg);
+                transform: rotate(90deg);
+            }
+            #right_pane h2 span {
+                padding: 3px;
+                vertical-align: middle;
+            }
+
             text {
                 font-family: sans-serif
+            }
+            #filter #filters_container{
+                display: none;
+                border: 1px solid #666
+            }
+            #filter h2{
+                background: url("assets/menu-alt-512.png") no-repeat left;
+                background-size: 20px;
+                padding: 5px 0 5px 25px;
+                margin: 0 0 0 0
+            }
+
+            #status {
+                position: absolute;
+                bottom: 0;
+                left: 0;
+                width: 100%;
+                margin: 0;
+                border-top: 1px solid #666;
+                height: 1.5em;
+            }
+            #status>span {
+                padding: 4px 4px 4px 0;
+                margin-right: 0.5em;
+                border-right: 1px solid #666;
+                display: inline-block;
+            }
+            #connection {
+                padding-right: 0.5em;
+                padding-left: 0.5em;
+                background: red;
+            }
+            #connection.on {
+                background: #11FF11;
+            }
+            #legend div {
+                padding: 0.5em;
+                text-align: center;
+                font-weight: bold;
+                font-size: 0.8em;
             }
           </style>
     </head>
@@ -41,9 +109,19 @@
             <button id="search">Search</button>
             <input type="checkbox" checked="checked" id="edgeLabels" /> Show edge labels
         </form>
-        <div></div>
-        <div id="details"></div>
+        <div id="filter">
+            <h2> Filters</h2>
+            <div id="filters_container">
+                <div id="edges"><h3>Traverse Edges</h3></div>
+            </div>
+        </div>
+        <div id="right_pane">
+            <h2><span>Details</span></h2>
+            <div id="details"></div>
+            <div id="legend"></div>
+        </div>
         <div id="graphDiv" style="width: 1000px; min-height=1000px;">
         </div>
+        <div id="status"><span id="connection">Disconnected</span><span id="nodesNum">Nodes displayed: <span>0/0</span></span></div>
     </body>
 </html>

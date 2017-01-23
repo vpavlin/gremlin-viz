@@ -2,24 +2,81 @@
 
 function GremlinViz(host, port) {
     //
+    this.host = host
+    this.port = port
     this.nodeR = 10
     this.showEdgeLabels = true
     this.detailsElem = $("#details")
+    this.filterElem = $("#filter #filters_container")
+    this.connectionElem = $("#connection")
+    this.connected = false
+    this.connectedCounter = 0
+    this.filters = {}
+    this.serverNodeCount = 0
     this.graph = Viva.Graph.graph();
     this.client = gremlin.createClient(port, host)
+    this.client.on('connect', function() {
+        console.log("Connection to Gremlin Server established!");
+        $(this.connectionElem).text("Connected").addClass("on")
+        this.connected = true
+    }.bind(this));
+    this.client.on('disconnect', function() {
+        console.log("Connection to Gremlin Server disconnected!");
+    });
+    this.client.on('error', function(msg) {
+        console.log("Something is wrong: "+msg) 
+    })
+    this.checkConnection = function() {
+        tm = setTimeout(function() {
+            this.connected = false
+            console.log("Probably disconnected:( ")
+            $(this.connectionElem).text("Disconnected").removeClass("on")
+            this.connectionCounter++
+            if (this.connectionCounter > 5) {
+                console.log("Reconnecting...")
+                this.client = gremlin.createClient(port, host)
+                this.connectionCounter = 0
+            }
+        }.bind(this), 5000)
+        this.client.execute("1+1", function(err, result) {
+            if (err) {
+                console.log(err)
+            }
+
+            if (result == 2) {
+                clearTimeout(tm)
+                $(this.connectionElem).text("Connected").addClass("on")
+                this.connected = true
+                this.connectionCounter = 0
+            }
+
+        }.bind(this))
+    }
+    setInterval(this.checkConnection.bind(this), 5000)
+
+
     this.query = function(query) {
+        console.log("Ready State: "+this.client.ws.readyState)
+        if (!this.client.connected) {
+            console.log("Disconnected")
+        }
+
         console.log("Will search for "+query)
         var t = this
+        //var q = query+".valueMap(true)"
         var query = this.client.stream(query);
             // If playing with classic TinkerPop graph, will emit 6 data events 
         query.on('data', function(result) {
+            //console.log(result)
           // Handle first vertex  
             if (result.objects !== undefined) {
                 t.drawMultiple(result)
             } else {
                 t.drawOne(result)
             }
-            t.render()
+            //t.render()
+
+            utils.setNodesCount(t.graph.getNodesCount(), t.serverNodeCount)
         });
          
         query.on('end', function() {
@@ -30,15 +87,12 @@ function GremlinViz(host, port) {
             console.log(e)
         });
 
-        query.on('open', function() {
-            console.log("Connection to Gremlin Server established!");
-        });
 
         return query
     }
 
     this.layout = Viva.Graph.Layout.forceDirected(this.graph, {
-                    springLength : 100,
+                    springLength : 150,
                     springCoeff : 0.0008,
                     dragCoeff : 0.1,
                     gravity : -1.2,
@@ -54,14 +108,14 @@ function GremlinViz(host, port) {
            var ui = Viva.Graph.svg('g')
            var rect = Viva.Graph.svg('circle')
                       .attr('r', t.nodeR)
-                      .attr('fill', utils.getColor(node.data.ecosystem[0].value));
-           var svgText = Viva.Graph.svg('text').text(utils.getName(node)).attr('y', (t.nodeR/2)+'px').attr('x', (t.nodeR+1)+'px')
+                      .attr('fill', utils.getColor(node.data.label));
+           //var svgText = Viva.Graph.svg('text').text(node.data.name).attr('y', (t.nodeR/2)+'px').attr('x', (t.nodeR+1)+'px')
            ui.append(rect)
-           ui.append(svgText)
+           //ui.append(svgText)
 
            $(ui).dblclick(function(e) {
                var backwards = false
-               if (e.ctrlKey) { backwards = true; console.log("Backwards: "+backwards)}
+               if (e.ctrlKey) { backwards = true;}
                var q = t.queryNeighbors(utils.searchById(node.id), backwards)
                t.query(q)
            });
@@ -150,13 +204,37 @@ function GremlinViz(host, port) {
     }
     this.setGraphics()
 
+    this.constructEdgeFilter = function(query) {
+        var q = ".or("
+        var filters = []
+        if (this.filters.edges !== undefined) {
+            for (e in this.filters.edges) {
+                if (this.filters.edges[e]) {
+                    filters.push("__().hasLabel('"+e+"')")
+                }
+            }
+            if (Object.keys(this.filters.edges).length != filters.length) {
+                q += filters.join(",")
+            } else {
+                return ""
+            }
+        }
+
+        q += ")"
+        return q
+    }
 
     this.queryNeighbors = function(search, backwards) {
+        this.checkFilters()
         var q = this.queryNode(search)
         if (backwards) {
-            q += ".inE().outV().path()";
+            q += ".inE()"
+            q += this.constructEdgeFilter(q)    
+            q += ".outV().path()";
         } else {
-            q += ".outE().inV().path()";
+            q += ".outE()"
+            q += this.constructEdgeFilter(q)    
+            q += ".inV().path()";
         }
         return q
     }
@@ -198,8 +276,25 @@ function GremlinViz(host, port) {
     }
 
     this.drawOne = function(result) {
-        //console.log(result.id)
-        this.graph.addNode(result.id, result.properties)
+        var o = this.getProperties(result)
+        //console.log(result)
+        this.graph.addNode(result.id, o)
+    }
+
+    this.getProperties = function(v) {
+        var o = {}
+        for (i in v) {
+            if (i == "properties")
+            {
+                $.extend(o, this.getProperties(v[i]))
+            } else if (typeof(v[i]) === "object") {
+                o[i] = v[i][0].value
+            } else {
+                o[i] = v[i]
+            }
+        }
+
+        return o
     }
 
     this.render = function() {
@@ -211,13 +306,14 @@ function GremlinViz(host, port) {
       graphics: this.graphics,
       layout: this.layout
     });
+    this.render()
 
     this.clear = function() {
         this.renderer.reset()
     }
 
     this.switchEdgeLabels = function(el) {
-        console.log(el)
+        //console.log(el)
         this.showEdgeLabels = el
         this.graph.forEachLink(function(link) {
             if (el) {
@@ -233,19 +329,55 @@ function GremlinViz(host, port) {
         table.append($("<tr></tr>").html("<td>id</td><td>"+node.id+"</td>"))
         for (i in node.data) {
             var o = node.data[i]
+            //console.log(o)
             var td1 = $("<td></td>").html(i)
-            var td2 = $("<td></td>").html(o[0].value)
+            var td2 = $("<td></td>")
+            if (typeof(o) === "object") {
+                td2.html(JSON.stringify(o))
+            } else {
+                td2.text(o.toString())
+            }
             var tr = $("<tr></tr>").append(td1).append(td2)
             table.append(tr)
         }
 
         $(this.detailsElem).html(table)
     }
+
+    this.checkFilters = function() {
+        var t = this
+        $(this.filterElem).children().each(function() {
+            var key = $(this).attr("id")
+            var values = {}
+            $(this).children().each(function() {
+                if ($(this).attr("type") == "checkbox") {
+                    var id = $(this).attr("id")
+                    var local_key = id.substr(id.indexOf("_")+1)
+                    values[local_key] = $(this).is(":checked")
+                }
+            })
+            t.filters[key] = values
+        })
+    }
+
+    this.getServerNodeCount = function() {
+        var t = this
+        var q = this.client.stream("g.V().count()")
+        q.on('data', function(result) {
+            t.serverNodeCount = result
+            utils.setNodesCount(t.graph.getNodesCount(), t.serverNodeCount)
+        })
+    }
+    this.getServerNodeCount()
+
+
+
+
 }
 
 var utils = {
     getName: function(node) {
-        console.log(node.data)
+        //console.log(node.data)
         return node.data.name[0].value
     },
     searchByName: function(name) {
@@ -277,27 +409,57 @@ var utils = {
             $("#ecosystems").append(option)
         })
     },
+    getLegend: function(client) {
+        var q = client.execute("g.V().label().dedup()", function(err, result) {
+            if (err) {
+                console.log(err)
+            } else {
+                console.log(result)
+                var legend = []
+                for (i in result) {
+                    legend.push($("<div></div>").css('background', utils.getColor(result[i])).text(result[i]))
+                }
+                $("#legend").append(legend)    
+            }
+        })
+    },
+    getEdgeFilterList: function(client) {
+        var q = client.stream("g.E().label().dedup()")
+        q.on('data', function(result) {
+            //console.log(result)
+            var label = "edge_"+result
+            var edge_label = $("<label></label>").attr("for", label).text(result)
+            var check = $("<input type='checkbox'>").attr('id', label).attr("name", label).attr("checked", "checked")
+            $("#filter #edges").append(check).append(edge_label).append("<br />")
+        })
+    },
     getColor: function(ecosystem) {
         var x = 0
         for (var i=0;i<ecosystem.length;i++) {
             x += ecosystem.charCodeAt(i)
         }
         var color = x.toString(16)
+        if (color.length <3) {color += color}
         return "#"+color.substr(0,3)
+    },
+    setNodesCount: function(currentCount, fullCount) {
+        $("#nodesNum span").text(currentCount+"/"+fullCount)
     }
 
 
 }
 
 $(document).ready(function() {
-    var host="172.20.0.2"
-    var port=8182
-    //var host='gremlin-websocket-data-model.che.ci.centos.org'
-    //var port=80
+    //var host="172.20.0.2"
+    //var port=8182
+    var host='gremlin-websocket-data-model.che.ci.centos.org'
+    var port=80
     
     var s1 = utils.searchByName("serve-static")
     var gv = new GremlinViz(host, port)
     utils.getEcosystems(gv.client)
+    utils.getEdgeFilterList(gv.client)
+    utils.getLegend(gv.client)
     //var q1 = gv.queryNeighbors(s1)
     //var query = gv.query(q1)
 
@@ -309,7 +471,7 @@ $(document).ready(function() {
         var properties = ["ecosystem", "name"]
         var values = [$("#ecosystems").val(), $("#value").val()]
         var s = utils.searchByProperties(properties, values)
-        console.log(s)
+        //console.log(s)
         var q = gv.queryNode(s)
 
         gv.query(q)
@@ -318,6 +480,16 @@ $(document).ready(function() {
     $("#edgeLabels").click(function() {
         gv.switchEdgeLabels($(this).is(":checked"))
 
+    })
+    $("#filter h2").click(function() {
+        $("#filter #filters_container").toggle()
+    })
+    $("#right_pane h2").click(function() {
+        if ($(this).parent().css("right") == "0px") {
+            $(this).parent().css("right", "-300px")
+        } else {
+            $(this).parent().css("right", 0)
+        }
     })
      
     //var renderer = Viva.Graph.View.renderer(graph);
