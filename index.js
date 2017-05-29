@@ -48,7 +48,7 @@ function GremlinViz(host, port) {
             this.connectionCounter++
             if (this.connectionCounter > 5) {
                 this.updateStatus("Reconnecting...")
-                this.client = gremlin.createClient(port, host)
+                this.client = gremlin.createClient(this.config.port, this.config.host)
                 this.connectionCounter = 0
             }
         }.bind(this), 5000)
@@ -77,6 +77,8 @@ function GremlinViz(host, port) {
         this.updateStatus("Will search for "+query)
         var t = this
         //var q = query+".valueMap(true)"
+        var d = new Date();
+        var started_at = d.getTime()
         var query = this.client.stream(query);
             // If playing with classic TinkerPop graph, will emit 6 data events 
         query.on('data', function(result) {
@@ -93,7 +95,10 @@ function GremlinViz(host, port) {
         });
          
         query.on('end', function() {
-          this.updateStatus("All results fetched");
+          var d = new Date()
+          var finished_at = d.getTime()
+          this.updateStatus("All results fetched in "+ (finished_at-started_at)/1000);
+
         }.bind(this));
 
         query.on('error', function(e) {
@@ -469,7 +474,7 @@ $(document).ready(function() {
     //var port=8182
     //
     config = {
-        host: 'gremlin-websocket-data-model.che.ci.centos.org',
+        host: "gremlin-vasek.dev.rdu2c.fabric8.io", //'gremlin-websocket-data-model.che.ci.centos.org',
         port: "80",
         search: [
             {
